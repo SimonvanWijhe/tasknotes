@@ -3753,6 +3753,8 @@ export class KanbanView extends BasesViewBase {
 						});
 					}
 
+					const dateModifiedValue = getCurrentTimestamp();
+
 					// Single atomic write: groupBy + swimlane + sort_order
 					await processVaultFrontMatter(this.plugin.app, file, (fm) => {
 						applyKanbanTaskDropFrontmatterPlan(fm, dropPlan, {
@@ -3769,7 +3771,7 @@ export class KanbanView extends BasesViewBase {
 							plan: dropPlan,
 							task: this.taskInfoCache.get(path),
 							dateModifiedField: this.plugin.fieldMapper.toUserField("dateModified"),
-							dateModifiedValue: getCurrentTimestamp(),
+							dateModifiedValue,
 						});
 						if (statusDerivativePlan) {
 							this.plugin.taskService.updateCompletedDateInFrontmatter(
@@ -3817,7 +3819,7 @@ export class KanbanView extends BasesViewBase {
 							const sideEffectPlan = planKanbanDropSideEffect({
 								plan: dropPlan,
 								originalTask,
-								dateModifiedValue: getCurrentTimestamp(),
+								dateModifiedValue,
 								isCompletedStatus: (status) =>
 									this.plugin.statusManager.isCompletedStatus(status),
 							});

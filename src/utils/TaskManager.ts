@@ -58,7 +58,8 @@ export class TaskManager extends Events {
 	private readonly DEBOUNCE_DELAY = 300; // 300ms delay after user stops typing
 
 	// Write-through fallback for files TaskNotes just wrote before Obsidian metadata is ready.
-	private pendingTaskInfoByPath = new Map<string, TaskInfo>();
+	private pendingTaskInfoByPath = new Map<string, { taskInfo: TaskInfo; writtenAt: number }>();
+	private readonly PENDING_TASK_INFO_TTL = 3000;
 
 	// Filter/query indexes, built lazily and maintained incrementally after first use.
 	private filterIndexesBuilt = false;
@@ -174,7 +175,7 @@ export class TaskManager extends Events {
 				const pendingTaskInfo = this.getPendingTaskInfo(file.path);
 				if (
 					pendingTaskInfo &&
-					this.shouldUsePendingTaskInfo(pendingTaskInfo, metadataTaskInfo)
+					this.shouldUsePendingTaskInfo(file.path, pendingTaskInfo, metadataTaskInfo)
 				) {
 					updatedTask = pendingTaskInfo;
 				} else {
@@ -223,13 +224,12 @@ export class TaskManager extends Events {
 	 * Handle file rename
 	 */
 	private handleFileRenamed(file: TFile, oldPath: string): void {
-		const pendingTaskInfo = this.pendingTaskInfoByPath.get(oldPath);
-		if (pendingTaskInfo) {
+		const pending = this.pendingTaskInfoByPath.get(oldPath);
+		if (pending) {
 			this.pendingTaskInfoByPath.delete(oldPath);
 			this.pendingTaskInfoByPath.set(file.path, {
-				...pendingTaskInfo,
-				id: file.path,
-				path: file.path,
+				...pending,
+				taskInfo: { ...pending.taskInfo, id: file.path, path: file.path },
 			});
 		}
 
@@ -284,7 +284,10 @@ export class TaskManager extends Events {
 			? this.extractTaskInfoFromNative(path, metadata.frontmatter)
 			: null;
 
-		if (pendingTaskInfo && this.shouldUsePendingTaskInfo(pendingTaskInfo, metadataTaskInfo)) {
+		if (
+			pendingTaskInfo &&
+			this.shouldUsePendingTaskInfo(path, pendingTaskInfo, metadataTaskInfo)
+		) {
 			return pendingTaskInfo;
 		}
 
@@ -294,7 +297,7 @@ export class TaskManager extends Events {
 	}
 
 	private getPendingTaskInfo(path: string): TaskInfo | null {
-		const taskInfo = this.pendingTaskInfoByPath.get(path);
+		const taskInfo = this.pendingTaskInfoByPath.get(path)?.taskInfo;
 		if (!taskInfo) return null;
 
 		return {
@@ -305,11 +308,17 @@ export class TaskManager extends Events {
 	}
 
 	private shouldUsePendingTaskInfo(
+		path: string,
 		pendingTaskInfo: TaskInfo,
 		metadataTaskInfo: TaskInfo | null
 	): boolean {
 		if (!metadataTaskInfo) {
 			return true;
+		}
+
+		const writtenAt = this.pendingTaskInfoByPath.get(path)?.writtenAt ?? 0;
+		if (Date.now() - writtenAt > this.PENDING_TASK_INFO_TTL) {
+			return false;
 		}
 
 		if (pendingTaskInfo.dateModified) {
@@ -960,7 +969,10 @@ export class TaskManager extends Events {
 		const metadataTaskInfo = this.isTaskFile(metadata.frontmatter)
 			? this.extractTaskInfoFromNative(path, metadata.frontmatter)
 			: null;
-		if (pendingTaskInfo && this.shouldUsePendingTaskInfo(pendingTaskInfo, metadataTaskInfo)) {
+		if (
+			pendingTaskInfo &&
+			this.shouldUsePendingTaskInfo(path, pendingTaskInfo, metadataTaskInfo)
+		) {
 			return pendingTaskInfo;
 		}
 
@@ -1259,9 +1271,8 @@ export class TaskManager extends Events {
 		}
 
 		this.pendingTaskInfoByPath.set(path, {
-			...taskInfo,
-			id: taskInfo.id ?? path,
-			path,
+			taskInfo: { ...taskInfo, id: taskInfo.id ?? path, path },
+			writtenAt: Date.now(),
 		});
 		filterIndexChanged = this.updateFilterIndexesFromTaskInfo(path, taskInfo);
 		this.trigger("file-updated", { path, updatedTask: taskInfo, filterIndexChanged });

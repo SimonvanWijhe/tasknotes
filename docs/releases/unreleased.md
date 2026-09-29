@@ -31,3 +31,7 @@ When a change has user-facing documentation, include a canonical tasknotes.dev l
 ```
 
 -->
+
+## Fixed
+
+- Fixed Kanban and Task List views ignoring changes made outside Obsidian to a task that had just been dragged to another column. Until now the card stayed in its old column until Obsidian was restarted.
