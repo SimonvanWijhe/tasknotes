@@ -1414,8 +1414,6 @@ export class TaskListView extends BasesViewBase {
 				includeDragged: false,
 			});
 
-			const dateModifiedValue = getCurrentTimestamp();
-
 			// Single atomic write: group property + sort_order + derivative fields
 			await processVaultFrontMatter(this.plugin.app, file, (fm) => {
 				applyTaskListDropFrontmatterMutation({
@@ -1433,7 +1431,7 @@ export class TaskListView extends BasesViewBase {
 							status,
 							isRecurring
 						),
-					getTimestamp: () => dateModifiedValue,
+					getTimestamp: getCurrentTimestamp,
 				});
 			});
 
@@ -1448,7 +1446,7 @@ export class TaskListView extends BasesViewBase {
 							plan: groupDropPlan,
 							isCompletedStatus: (status) =>
 								this.plugin.statusManager.isCompletedStatus(status),
-							getTimestamp: () => dateModifiedValue,
+							getTimestamp: getCurrentTimestamp,
 							getCompletedDate: () => new Date().toISOString().split("T")[0],
 						});
 						if (updatedTask) {
